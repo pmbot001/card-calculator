@@ -1,0 +1,12 @@
+{
+  "name": "card-calculator",
+  "version": "1.0.0",
+  "description": "卡牌轉盤精算工具",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
