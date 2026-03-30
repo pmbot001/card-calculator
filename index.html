@@ -115,7 +115,7 @@ td input:focus{outline:none;border-color:var(--blue-dark);box-shadow:0 0 0 2px r
       <div class="params-row">
         <div class="param-group"><label>總投注額 (RMB)</label><input type="number" id="totalBet" value="100000000" class="wide" oninput="calc()"></div>
         <div class="param-group"><label>RTP %</label><input type="number" id="rtp" value="1" step="0.1" min="0" max="100" style="width:60px" oninput="calc()"></div>
-        <div class="param-group"><label>總券數</label><input type="number" id="tickets" value="100000" oninput="calc()"></div>
+        <div class="param-group"><label>總券數</label><input type="number" id="tickets" value="100000" oninput="onTicketsChange()"></div>
       </div>
     </div>
 
@@ -199,9 +199,25 @@ function solveWeights(bigP,midP,smallP){
   return{intB:iB,intM:iM,intS:iS,verB:vB,verM:vM,verS:vS};
 }
 
+let _lastTickets=100000;
+
+function onTicketsChange(){
+  const newTickets=gv('tickets');
+  if(newTickets>0 && _lastTickets>0 && newTickets!==_lastTickets){
+    const ratio=newTickets/_lastTickets;
+    sr.forEach(c=>{c.qty=Math.max(Math.round(c.qty*ratio),1)});
+    sets.forEach(c=>{c.cqty=Math.max(Math.round(c.cqty*ratio),1)});
+    const newPqty=Math.max(Math.round(gv('playerQty')*ratio),1);
+    document.getElementById('playerQty').value=newPqty;
+    _lastTickets=newTickets;
+  }
+  calc();
+}
+
 function calc(){
   const totalBet=gv('totalBet'),rtp=gv('rtp')/100,tickets=gv('tickets'),pqty=gv('playerQty'),rr=gv('redeemRate')/100;
   const budget=totalBet*rtp;
+  _lastTickets=tickets;
 
   sr.forEach((c,i)=>{
     const pEl=document.getElementById('sr-prize-'+i);
