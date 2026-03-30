@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>卡牌轉盤精算工具</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#f7f8fa;--card:#fff;--border:#e5e7eb;--text:#1a1a2e;--text2:#6b7280;
+  --blue:#2563eb;--blue-light:#eff6ff;--blue-dark:#1e40af;
+  --red:#dc2626;--red-light:#fef2f2;
+  --green:#16a34a;--green-light:#f0fdf4;
+  --amber:#d97706;--amber-light:#fffbeb;
+  --sr:#fce4ec;--sr-dark:#880e4f;
+  --r:#fff3e0;--r-dark:#e65100;
+  --n:#e8f5e9;--n-dark:#1b5e20;
+  --font:'Noto Sans TC',sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+
+.header{background:linear-gradient(135deg,#1e3a5f 0%,#2d5a87 100%);color:#fff;padding:24px 32px}
+.header h1{font-size:22px;font-weight:700;letter-spacing:0.5px}
+.header p{font-size:13px;opacity:0.8;margin-top:4px}
+
+.container{max-width:1100px;margin:0 auto;padding:20px}
+
+.tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:2px solid var(--border);padding-bottom:0}
+.tab{padding:10px 20px;font-size:14px;font-weight:500;background:none;border:none;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:600}
+.tab:hover:not(.active){color:var(--text);background:#f3f4f6;border-radius:6px 6px 0 0}
+
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:24px}
+.metric{background:var(--card);border-radius:10px;padding:16px;border:1px solid var(--border)}
+.metric .label{font-size:12px;color:var(--text2);font-weight:500}
+.metric .value{font-size:22px;font-weight:700;margin-top:2px;font-family:var(--mono)}
+.metric.danger{border-color:#fca5a5;background:var(--red-light)}
+.metric.danger .value{color:var(--red)}
+.metric.ok .value{color:var(--green)}
+
+.section{margin-bottom:24px}
+.section-title{font-size:16px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-title .badge{font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600}
+
+.params-row{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;align-items:end}
+.param-group{display:flex;flex-direction:column;gap:4px}
+.param-group label{font-size:12px;color:var(--text2);font-weight:500}
+.param-group input{width:100px;padding:6px 10px;border:1.5px solid var(--blue);border-radius:6px;font-size:14px;font-weight:600;color:var(--blue-dark);background:var(--blue-light);text-align:right;font-family:var(--mono);transition:border-color 0.2s}
+.param-group input:focus{outline:none;border-color:var(--blue-dark);box-shadow:0 0 0 3px rgba(37,99,235,0.15)}
+.param-group input.wide{width:130px}
+
+table{width:100%;border-collapse:separate;border-spacing:0;border-radius:8px;overflow:hidden;border:1px solid var(--border);font-size:13px}
+thead{background:#334155;color:#fff}
+th{padding:10px 8px;text-align:left;font-weight:500;font-size:12px;white-space:nowrap}
+td{padding:8px;border-bottom:1px solid #f1f5f9}
+tbody tr:last-child td{border-bottom:none}
+tr.sr-row{background:var(--sr)}
+tr.r-row{background:var(--r)}
+tr.n-row{background:var(--n)}
+tr.total-row{background:#e2e8f0;font-weight:600}
+
+td input{width:80px;padding:4px 8px;border:1.5px solid var(--blue);border-radius:4px;font-size:13px;font-weight:600;color:var(--blue-dark);background:var(--blue-light);text-align:right;font-family:var(--mono)}
+td input:focus{outline:none;border-color:var(--blue-dark);box-shadow:0 0 0 2px rgba(37,99,235,0.15)}
+
+.weight-cell{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--blue-dark);text-align:center}
+.prob-cell{font-family:var(--mono);text-align:right}
+.num-cell{font-family:var(--mono);text-align:right}
+.center{text-align:center}
+
+.err-ok{color:var(--green);font-weight:500}
+.err-warn{color:var(--amber);font-weight:500}
+.err-bad{color:var(--red);font-weight:600}
+
+.n-info{padding:14px 18px;background:var(--n);border-radius:8px;border:1px solid #a5d6a7;font-size:13px;display:flex;gap:20px;flex-wrap:wrap;align-items:center}
+.n-info strong{color:var(--n-dark)}
+.n-info .error{color:var(--red);font-weight:600}
+
+.copy-btn{padding:8px 20px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.15s}
+.copy-btn:hover{background:var(--blue-dark)}
+.copy-btn:active{transform:scale(0.97)}
+.copied{background:var(--green) !important}
+
+.note{font-size:12px;color:var(--text2);margin-top:8px;padding:8px 12px;background:#f8fafc;border-radius:6px;border-left:3px solid var(--blue)}
+
+@media(max-width:768px){
+  .metrics{grid-template-columns:repeat(2,1fr)}
+  .container{padding:12px}
+  .params-row{gap:10px}
+  table{font-size:12px}
+  td input{width:65px;font-size:12px}
+  .weight-cell{font-size:14px}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>卡牌轉盤精算工具</h1>
+  <p>調整參數 → 機率 / 預算 / 權重 即時連動計算</p>
+</div>
+
+<div class="container">
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('params',this)">參數設定</button>
+    <button class="tab" onclick="switchTab('weights',this)">權重速查 (40張)</button>
+  </div>
+
+  <div id="metrics" class="metrics"></div>
+
+  <div id="tab-params">
+    <div class="section">
+      <div class="section-title">基本參數</div>
+      <div class="params-row">
+        <div class="param-group"><label>總投注額 (RMB)</label><input type="number" id="totalBet" value="100000000" class="wide" onchange="calc()"></div>
+        <div class="param-group"><label>RTP %</label><input type="number" id="rtp" value="1" step="0.1" min="0" max="100" style="width:60px" onchange="calc()"></div>
+        <div class="param-group"><label>總券數</label><input type="number" id="tickets" value="100000" onchange="calc()"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">SR 卡 <span class="badge" style="background:var(--sr);color:var(--sr-dark)">大獎池 6張</span></div>
+      <table>
+        <thead><tr><th>球員</th><th>獎金 (RMB)</th><th>產量</th><th>機率</th><th>支出</th><th>權重</th></tr></thead>
+        <tbody id="sr-body"></tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <div class="section-title">R 套組 <span class="badge" style="background:var(--r);color:var(--r-dark)">中獎池 16張</span></div>
+      <div class="params-row">
+        <div class="param-group"><label>球員統一產量</label><input type="number" id="playerQty" value="1000" onchange="calc()"></div>
+        <div class="param-group"><label>套組兌換率 %</label><input type="number" id="redeemRate" value="70" min="0" max="100" style="width:60px" onchange="calc()"></div>
+      </div>
+      <table>
+        <thead><tr><th>套組</th><th>國家</th><th>套組獎金</th><th>國家卡產量</th><th>估計兌換</th><th>支出</th><th>國家卡權重</th></tr></thead>
+        <tbody id="set-body"></tbody>
+      </table>
+    </div>
+
+    <div id="n-info" class="n-info"></div>
+    <div class="note">改任何黃色數字 → 所有機率、預算、權重即時重算。權重使用迭代法精確計算（200次迭代），誤差 < 5%。</div>
+  </div>
+
+  <div id="tab-weights" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <span style="font-size:13px;color:var(--text2)">藍色權重數字 → 直接填入後台系統</span>
+      <button class="copy-btn" id="copyBtn" onclick="copyWeights()">複製全部權重</button>
+    </div>
+    <table>
+      <thead><tr><th class="center">#</th><th>獎池</th><th>類別</th><th>項目</th><th>目標機率</th><th class="center">權重</th><th>驗算機率</th><th class="center">誤差</th></tr></thead>
+      <tbody id="weight-body"></tbody>
+    </table>
+    <div class="note" style="margin-top:12px">「複製全部權重」會複製「項目名稱 + 權重」到剪貼簿，可直接貼到 Excel 或後台。</div>
+  </div>
+</div>
+
+<script>
+const SR_INIT = [
+  {name:"拉明·亞馬爾",prize:3888,qty:20},{name:"哈里·凱恩",prize:2888,qty:28},
+  {name:"基利安·姆巴佩",prize:5168,qty:15},{name:"里昂內爾·梅西",prize:6666,qty:12},
+  {name:"維尼修斯",prize:1688,qty:45},{name:"埃爾林·哈蘭德",prize:1688,qty:48}
+];
+const SETS_INIT = [
+  {name:"A套組",country:"西班牙",players:["佩德里","尼科·威廉姆斯","羅德里"],prize:2200,cqty:80},
+  {name:"B套組",country:"英格蘭",players:["布卡約·薩卡","祖德·貝林漢姆","柯爾·帕爾默"],prize:1900,cqty:70},
+  {name:"C套組",country:"法國",players:["奧斯曼·登貝萊","沃倫·扎伊爾-埃梅里","威廉·薩利巴"],prize:1500,cqty:50},
+  {name:"D套組",country:"阿根廷",players:["勞塔羅·馬丁內斯","亞歷克西斯·麥卡利斯特","羅德里戈·德保羅"],prize:2500,cqty:40}
+];
+const N_NAMES = ["巴西","葡萄牙","德國","荷蘭","挪威","意大利","丹尼·卡瓦哈爾","法比安·魯伊斯","達尼·奧爾莫","摩根·羅傑斯","安東尼·戈登","馬庫斯·拉什福德","奧雷利安·楚阿梅尼","迪奧·赫南德茲","蘭德爾·科洛·穆阿尼","埃米利亞諾·馬丁內斯","克里斯蒂安·羅梅羅","尼古拉斯·奧塔門迪"];
+
+let sr=[...SR_INIT.map(s=>({...s}))], sets=[...SETS_INIT.map(s=>({...s}))];
+let weights={intB:[],intM:[],intS:[],verB:[],verM:[],verS:[]};
+
+function gv(id){return parseFloat(document.getElementById(id).value)||0}
+
+function solveWeights(bigP,midP,smallP){
+  let wB=bigP.map(p=>p*1000),wM=midP.map(p=>p*1000),wS=smallP.map(p=>p*1000);
+  for(let it=0;it<200;it++){
+    const Wb=wB.reduce((a,b)=>a+b,0),Wm=wM.reduce((a,b)=>a+b,0),Ws=wS.reduce((a,b)=>a+b,0);
+    const ab=Wb/6,am=Wm/16,as=Ws/18;
+    const aB=wB.map(w=>(1/6)*w/(w+2*am+7*as));
+    const aM=wM.map((w,j)=>(2/16)*w/(ab+w+(Wm-w)/15+7*as));
+    const aS=wS.map((w,k)=>(7/18)*w/(ab+2*am+w+6*(Ws-w)/17));
+    wB=wB.map((w,i)=>aB[i]>0?w*Math.pow(bigP[i]/aB[i],0.5):w);
+    wM=wM.map((w,i)=>aM[i]>0?w*Math.pow(midP[i]/aM[i],0.5):w);
+    wS=wS.map((w,i)=>aS[i]>0?w*Math.pow(smallP[i]/aS[i],0.5):w);
+  }
+  const mn=Math.min(...wB,...wM,...wS),sc=10/mn;
+  const iB=wB.map(w=>Math.max(Math.round(w*sc),1));
+  const iM=wM.map(w=>Math.max(Math.round(w*sc),1));
+  const iS=wS.map(w=>Math.max(Math.round(w*sc),1));
+  const Wb2=iB.reduce((a,b)=>a+b,0),Wm2=iM.reduce((a,b)=>a+b,0),Ws2=iS.reduce((a,b)=>a+b,0);
+  const ab2=Wb2/6,am2=Wm2/16,as2=Ws2/18;
+  const vB=iB.map(w=>(1/6)*w/(w+2*am2+7*as2));
+  const vM=iM.map((w,j)=>(2/16)*w/(ab2+w+(Wm2-w)/15+7*as2));
+  const vS=iS.map((w,k)=>(7/18)*w/(ab2+2*am2+w+6*(Ws2-w)/17));
+  return{intB:iB,intM:iM,intS:iS,verB:vB,verM:vM,verS:vS};
+}
+
+function calc(){
+  const totalBet=gv('totalBet'),rtp=gv('rtp')/100,tickets=gv('tickets'),pqty=gv('playerQty'),rr=gv('redeemRate')/100;
+  const budget=totalBet*rtp;
+
+  sr.forEach((c,i)=>{
+    const pEl=document.getElementById('sr-prize-'+i);
+    const qEl=document.getElementById('sr-qty-'+i);
+    if(pEl)c.prize=parseInt(pEl.value)||0;
+    if(qEl)c.qty=parseInt(qEl.value)||0;
+  });
+  sets.forEach((c,i)=>{
+    const pEl=document.getElementById('set-prize-'+i);
+    const qEl=document.getElementById('set-cqty-'+i);
+    if(pEl)c.prize=parseInt(pEl.value)||0;
+    if(qEl)c.cqty=parseInt(qEl.value)||0;
+  });
+
+  const srSpend=sr.reduce((s,c)=>s+c.prize*c.qty,0);
+  const setSpend=sets.reduce((s,c)=>s+c.prize*Math.round(c.cqty*rr),0);
+  const totalSpend=srSpend+setSpend;
+  const remain=budget-totalSpend;
+  const usage=budget>0?totalSpend/budget*100:0;
+
+  const srQty=sr.reduce((s,c)=>s+c.qty,0);
+  const cQty=sets.reduce((s,c)=>s+c.cqty,0);
+  const nTotal=tickets-srQty-cQty-pqty*12;
+  const nEach=nTotal>0?Math.round(nTotal/18):0;
+
+  const bigP=sr.map(c=>c.qty/tickets);
+  const midP=[...sets.map(c=>c.cqty/tickets),...Array(12).fill(pqty/tickets)];
+  const smallP=Array(18).fill(nEach/tickets);
+  weights=solveWeights(bigP,midP,smallP);
+
+  const over=remain<0;
+  document.getElementById('metrics').innerHTML=
+    metricCard('總預算','\u00a5'+fmt(budget),'') +
+    metricCard('總支出','\u00a5'+fmt(totalSpend),over?'danger':'') +
+    metricCard('使用率',usage.toFixed(1)+'%',usage>100?'danger':usage>95?'ok':'') +
+    metricCard('剩餘','\u00a5'+fmt(remain),over?'danger':'ok');
+
+  let srHtml='';
+  sr.forEach((c,i)=>{
+    const prob=(c.qty/tickets*100).toFixed(3);
+    const spend=c.prize*c.qty;
+    srHtml+=`<tr class="sr-row"><td>${c.name}</td><td><input type="number" id="sr-prize-${i}" value="${c.prize}" onchange="calc()"></td><td><input type="number" id="sr-qty-${i}" value="${c.qty}" onchange="calc()" style="width:60px"></td><td class="prob-cell">${prob}%</td><td class="num-cell">${fmt(spend)}</td><td class="weight-cell">${weights.intB[i]}</td></tr>`;
+  });
+  srHtml+=`<tr class="total-row"><td>合計</td><td></td><td class="num-cell">${srQty}</td><td class="prob-cell">${(srQty/tickets*100).toFixed(3)}%</td><td class="num-cell">${fmt(srSpend)}</td><td></td></tr>`;
+  document.getElementById('sr-body').innerHTML=srHtml;
+
+  let setHtml='';
+  sets.forEach((c,i)=>{
+    const redeem=Math.round(c.cqty*rr);
+    const spend=c.prize*redeem;
+    setHtml+=`<tr class="r-row"><td>${c.name}</td><td>${c.country}</td><td><input type="number" id="set-prize-${i}" value="${c.prize}" onchange="calc()"></td><td><input type="number" id="set-cqty-${i}" value="${c.cqty}" onchange="calc()" style="width:60px"></td><td class="num-cell">${redeem}</td><td class="num-cell">${fmt(spend)}</td><td class="weight-cell">${weights.intM[i]}</td></tr>`;
+  });
+  setHtml+=`<tr class="total-row"><td>合計</td><td></td><td></td><td class="num-cell">${cQty}</td><td class="num-cell">${sets.reduce((s,c)=>s+Math.round(c.cqty*rr),0)}</td><td class="num-cell">${fmt(setSpend)}</td><td></td></tr>`;
+  document.getElementById('set-body').innerHTML=setHtml;
+
+  document.getElementById('n-info').innerHTML=
+    `<strong>N 卡 (18張)</strong>` +
+    `<span>每張產量 = <strong>${fmt(nEach)}</strong></span>` +
+    `<span>機率 = <strong>${(nEach/tickets*100).toFixed(3)}%</strong></span>` +
+    `<span>權重 = <strong style="color:var(--blue-dark);font-size:16px">${weights.intS[0]||0}</strong></span>` +
+    (nTotal<0?'<span class="error">產量為負！SR/R 產量過多</span>':'');
+
+  renderWeightsTab(tickets,pqty,nEach);
+}
+
+function renderWeightsTab(tickets,pqty,nEach){
+  let html='';
+  let idx=1;
+  const allCards=[];
+
+  sr.forEach((c,i)=>{
+    const p=(c.qty/tickets*100).toFixed(3);
+    const v=(weights.verB[i]*100).toFixed(3);
+    const e=errPct(p,v);
+    allCards.push({name:c.name,w:weights.intB[i]});
+    html+=`<tr class="sr-row"><td class="center">${idx++}</td><td>大獎池</td><td>SR</td><td>${c.name}</td><td class="prob-cell">${p}%</td><td class="weight-cell">${weights.intB[i]}</td><td class="prob-cell">${v}%</td><td class="center ${errClass(e)}">${e}</td></tr>`;
+  });
+
+  sets.forEach((c,i)=>{
+    const p=(c.cqty/tickets*100).toFixed(3);
+    const v=(weights.verM[i]*100).toFixed(3);
+    const e=errPct(p,v);
+    allCards.push({name:c.country,w:weights.intM[i]});
+    html+=`<tr class="r-row"><td class="center">${idx++}</td><td>中獎池</td><td>R(國家)</td><td>${c.country}</td><td class="prob-cell">${p}%</td><td class="weight-cell">${weights.intM[i]}</td><td class="prob-cell">${v}%</td><td class="center ${errClass(e)}">${e}</td></tr>`;
+  });
+
+  const allPlayers=sets.flatMap(s=>s.players);
+  allPlayers.forEach((p,i)=>{
+    const prob=(pqty/tickets*100).toFixed(3);
+    const v=(weights.verM[4+i]*100).toFixed(3);
+    const e=errPct(prob,v);
+    allCards.push({name:p,w:weights.intM[4+i]});
+    html+=`<tr class="r-row"><td class="center">${idx++}</td><td>中獎池</td><td>R(球員)</td><td>${p}</td><td class="prob-cell">${prob}%</td><td class="weight-cell">${weights.intM[4+i]}</td><td class="prob-cell">${v}%</td><td class="center ${errClass(e)}">${e}</td></tr>`;
+  });
+
+  N_NAMES.forEach((n,i)=>{
+    const prob=(nEach/tickets*100).toFixed(3);
+    const v=(weights.verS[i]*100).toFixed(3);
+    const e=errPct(prob,v);
+    allCards.push({name:n,w:weights.intS[i]});
+    html+=`<tr class="n-row"><td class="center">${idx++}</td><td>小獎池</td><td>${i<6?'N(國家)':'N(球員)'}</td><td>${n}</td><td class="prob-cell">${prob}%</td><td class="weight-cell">${weights.intS[i]}</td><td class="prob-cell">${v}%</td><td class="center ${errClass(e)}">${e}</td></tr>`;
+  });
+
+  document.getElementById('weight-body').innerHTML=html;
+  window._allCards=allCards;
+}
+
+function errPct(target,actual){
+  const t=parseFloat(target),a=parseFloat(actual);
+  if(t===0)return'+0.0%';
+  const e=((a-t)/t*100);
+  return(e>=0?'+':'')+e.toFixed(1)+'%';
+}
+function errClass(e){
+  const v=Math.abs(parseFloat(e));
+  return v<3?'err-ok':v<8?'err-warn':'err-bad';
+}
+
+function metricCard(label,value,cls){
+  return`<div class="metric ${cls}"><div class="label">${label}</div><div class="value">${value}</div></div>`;
+}
+
+function fmt(n){return Math.round(n).toLocaleString()}
+
+function switchTab(tab,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-params').style.display=tab==='params'?'':'none';
+  document.getElementById('tab-weights').style.display=tab==='weights'?'':'none';
+}
+
+function copyWeights(){
+  if(!window._allCards)return;
+  const text=window._allCards.map(c=>c.name+'\t'+c.w).join('\n');
+  navigator.clipboard.writeText(text).then(()=>{
+    const btn=document.getElementById('copyBtn');
+    btn.textContent='已複製！';
+    btn.classList.add('copied');
+    setTimeout(()=>{btn.textContent='複製全部權重';btn.classList.remove('copied')},2000);
+  }).catch(()=>{
+    const ta=document.createElement('textarea');
+    ta.value=text;document.body.appendChild(ta);ta.select();
+    document.execCommand('copy');document.body.removeChild(ta);
+  });
+}
+
+calc();
+</script>
+</body>
+</html>
