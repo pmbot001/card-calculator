@@ -111,7 +111,6 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       <div class="params-row">
         <div class="param-group"><label>大奖池预算 %</label><input type="number" id="srPct" value="30" min="0" max="100" style="width:60px" oninput="calc()"></div>
         <div class="param-group"><label>中奖池预算 %</label><input type="number" id="rPct" value="50" min="0" max="100" style="width:60px" oninput="calc()"></div>
-        <div class="param-group"><label>小奖池预算 %</label><div class="derived" id="nPctDisplay">20</div></div>
       </div>
     </div>
 
@@ -232,7 +231,6 @@ function calc(){
   const focusedStart = document.activeElement && document.activeElement.selectionStart;
   const focusedEnd   = document.activeElement && document.activeElement.selectionEnd;
 
-  document.getElementById('nPctDisplay').textContent = (nPct*100).toFixed(0);
 
   // Read prizes from inputs
   sr.forEach((c,i)=>{
