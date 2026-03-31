@@ -239,15 +239,20 @@ function calc(){
   sr.forEach((c,i)=>{ const el=document.getElementById('sr-prize-'+i); if(el) c.prize=parseInt(el.value)||1; });
   sets.forEach((c,i)=>{ const el=document.getElementById('set-prize-'+i); if(el) c.prize=parseInt(el.value)||1; });
 
-  // === 方案A：以 tickets 為主軸 ===
-  // SR：srPct% 的票數，平均分配給每張 SR 卡
+  // === 方案A：以 tickets 為主軸，池內按獎金倒數分配（高獎金=低產量）===
   const numSR = sr.length;
-  sr.forEach(c=>{ c.qty = Math.max(Math.round(tickets * srPct / numSR), 1); });
+  const srTickets = tickets * srPct;
+  const srInvSum = sr.reduce((s,c)=>s+1/c.prize, 0);
+  sr.forEach(c=>{
+    c.qty = Math.max(Math.round(srTickets * (1/c.prize) / srInvSum), 1);
+  });
 
-  // R：rPct% 的票數，每套組平分；套組內按 1:pMult 拆分國家卡與球員卡
+  // R：rPct% 票數，按套組獎金倒數分配；套組內按 1:pMult 拆分國家卡與球員卡
   const numSets = sets.length;
+  const rTickets = tickets * rPct;
+  const rInvSum = sets.reduce((s,c)=>s+1/c.prize, 0);
   sets.forEach(c=>{
-    const setTickets = tickets * rPct / numSets;
+    const setTickets = rTickets * (1/c.prize) / rInvSum;
     const totalParts = 1 + c.players.length * pMult;
     c.cqty = Math.max(Math.round(setTickets / totalParts), 1);
     c.pqty = Math.max(Math.round(c.cqty * pMult), 1);
