@@ -112,6 +112,11 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
         <div class="param-group"><label>大奖池票数占比 %</label><input type="number" id="srPct" value="0.1" min="0" max="100" step="0.01" style="width:70px" oninput="calc()"></div>
         <div class="param-group"><label>中奖池票数占比 %</label><input type="number" id="rPct" value="2" min="0" max="100" step="0.1" style="width:70px" oninput="calc()"></div>
       </div>
+      <div class="params-row">
+        <div class="param-group"><label>每次从大奖池抽</label><input type="number" id="drawB" value="1" min="1" style="width:60px" oninput="calc()"></div>
+        <div class="param-group"><label>每次从中奖池抽</label><input type="number" id="drawM" value="2" min="1" style="width:60px" oninput="calc()"></div>
+        <div class="param-group"><label>每次从小奖池抽</label><input type="number" id="drawS" value="7" min="1" style="width:60px" oninput="calc()"></div>
+      </div>
     </div>
 
     <div class="section">
@@ -187,39 +192,37 @@ let weights = {intB:[],intM:[],intS:[],verB:[],verM:[],verS:[]};
 function gv(id){ return parseFloat(document.getElementById(id).value)||0 }
 function fmt(n){ return Math.round(n).toLocaleString() }
 
-function solveWeights(bigP, midP, smallP){
+// 正确公式推导：
+// 抽卡流程：Step1 从大/中/小池各均匀抽 drawB/drawM/drawS 张，Step2 转盘按权重抽1张。
+// P(i赢) = P(i被抽中) × P(i赢转盘|i在盘上)
+//        = (drawB/nB) × w_i / E[转盘总权重]
+// E[总权重] = drawB×(W_B/nB) + drawM×(W_M/nM) + drawS×(W_S/nS)
+// 令 D = drawB×W_B/nB + drawM×W_M/nM + drawS×W_S/nS
+// 则 P(i赢) = (drawB/nB) × w_i / D
+// 要匹配目标概率 p_i：w_i ∝ p_i × nB/drawB（闭合解，无需迭代）
+function solveWeights(bigP, midP, smallP, drawB, drawM, drawS){
   const nB=bigP.length, nM=midP.length, nS=smallP.length;
-  const total=nB+nM+nS;
-  const slotB=nB/total, slotM=nM/total, slotS=nS/total;
+  const dB=Math.max(drawB,1), dM=Math.max(drawM,1), dS=Math.max(drawS,1);
 
-  let wB=bigP.map(p=>Math.max(p,1e-12)*1000);
-  let wM=midP.map(p=>Math.max(p,1e-12)*1000);
-  let wS=smallP.map(p=>Math.max(p,1e-12)*1000);
+  // 闭合解：权重正比于 目标概率 × 池张数 / 每次抽取数
+  const rawB=bigP.map(p=>p*nB/dB);
+  const rawM=midP.map(p=>p*nM/dM);
+  const rawS=smallP.map(p=>p*(nS||1)/dS);
 
-  for(let it=0;it<200;it++){
-    const Wb=wB.reduce((a,b)=>a+b,0), Wm=wM.reduce((a,b)=>a+b,0), Ws=wS.reduce((a,b)=>a+b,0);
-    const ab=Wb/nB, am=Wm/nM, as_=Ws/nS;
-    const aB=wB.map(w=>(slotB/nB)*w/(w+(nM>0?slotM/slotB*am:0)+(nS>0?slotS/slotB*as_:0)));
-    const aM=wM.map(w=>(slotM/nM)*w/((nB>0?slotB/slotM*ab:0)+w+(Wm-w)/(nM-1||1)*(1/nM)+(nS>0?slotS/slotM*as_:0)));
-    const aS=wS.map(w=>(slotS/nS)*w/((nB>0?slotB/slotS*ab:0)+(nM>0?slotM/slotS*am:0)+w+(Ws-w)/(nS-1||1)*(1/nS)));
-    wB=wB.map((w,i)=>aB[i]>0?w*Math.pow(bigP[i]/aB[i],0.5):w);
-    wM=wM.map((w,i)=>aM[i]>0?w*Math.pow(midP[i]/aM[i],0.5):w);
-    wS=wS.map((w,i)=>aS[i]>0?w*Math.pow(smallP[i]/aS[i],0.5):w);
-  }
-
-  const allW=[...wB,...wM,...wS];
-  const mn=Math.min(...allW.filter(w=>w>0));
+  // 缩放到整数（最小值约为10）
+  const allRaw=[...rawB,...rawM,...rawS].filter(w=>w>0);
+  const mn=allRaw.length>0?Math.min(...allRaw):1;
   const sc=10/(mn||1);
-  const iB=wB.map(w=>Math.max(Math.round(w*sc),1));
-  const iM=wM.map(w=>Math.max(Math.round(w*sc),1));
-  const iS=wS.map(w=>Math.max(Math.round(w*sc),1));
+  const iB=rawB.map(w=>Math.max(Math.round(w*sc),1));
+  const iM=rawM.map(w=>Math.max(Math.round(w*sc),1));
+  const iS=rawS.map(w=>Math.max(Math.round(w*sc),1));
 
-  // Verify
-  const Wb2=iB.reduce((a,b)=>a+b,0), Wm2=iM.reduce((a,b)=>a+b,0), Ws2=iS.reduce((a,b)=>a+b,0);
-  const ab2=Wb2/nB, am2=Wm2/nM, as2=Ws2/(nS||1);
-  const vB=iB.map(w=>(slotB/nB)*w/(w+(nM>0?slotM/slotB*am2:0)+(nS>0?slotS/slotB*as2:0)));
-  const vM=iM.map(w=>(slotM/nM)*w/((nB>0?slotB/slotM*ab2:0)+w+(Wm2-w)/(nM-1||1)*(1/nM)+(nS>0?slotS/slotM*as2:0)));
-  const vS=iS.map(w=>(slotS/nS)*w/((nB>0?slotB/slotS*ab2:0)+(nM>0?slotM/slotS*am2:0)+w+(Ws2-w)/(nS-1||1)*(1/nS)));
+  // 验算：P(i赢) = (drawX/nX) × w_i / D
+  const Wb=iB.reduce((a,b)=>a+b,0), Wm=iM.reduce((a,b)=>a+b,0), Ws=iS.reduce((a,b)=>a+b,0);
+  const D=dB*(Wb/nB)+dM*(Wm/nM)+dS*(Ws/(nS||1));
+  const vB=iB.map(w=>(dB/nB)*w/D);
+  const vM=iM.map(w=>(dM/nM)*w/D);
+  const vS=iS.map(w=>(dS/(nS||1))*w/D);
 
   return {intB:iB,intM:iM,intS:iS,verB:vB,verM:vM,verS:vS};
 }
@@ -274,12 +277,13 @@ function calc(){
   const usage = budget>0 ? totalSpend/budget*100 : 0;
   const over = remain < 0;
 
-  // === 權重 ===
+  // === 权重 ===
+  const drawB=Math.max(gv('drawB'),1), drawM=Math.max(gv('drawM'),1), drawS=Math.max(gv('drawS'),1);
   const numRCards = sets.reduce((s,c)=>s+1+c.players.length, 0);
   const bigP = sr.map(c=>c.qty/tickets);
   const midP = sets.flatMap(c=>[c.cqty/tickets, ...c.players.map(()=>c.pqty/tickets)]);
   const smallP = Array(numN).fill(nEach/tickets);
-  weights = solveWeights(bigP, midP, smallP);
+  weights = solveWeights(bigP, midP, smallP, drawB, drawM, drawS);
 
   // === 更新張數顯示 ===
   document.getElementById('srCount').textContent = numSR;
