@@ -88,8 +88,16 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 <body>
 
 <div class="header">
-  <h1>卡牌转盘精算工具</h1>
-  <p>设定票数占比 → 产量 / 概率 / 权重即时分配，预算使用率同步验算</p>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start">
+    <div>
+      <h1>卡牌转盘精算工具</h1>
+      <p>设定票数占比 → 产量 / 概率 / 权重即时分配，预算使用率同步验算</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+      <span id="saveIndicator" style="font-size:12px;opacity:0;color:#86efac;transition:opacity 0.4s">✓ 已保存</span>
+      <button onclick="resetState()" style="padding:6px 14px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;font-size:12px;cursor:pointer;font-family:var(--font)" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">重置默认值</button>
+    </div>
+  </div>
 </div>
 
 <div class="container">
@@ -339,6 +347,7 @@ function calc(){
     (nTotal<0?'<span class="error">产量为负！SR/R 产量超过总券数</span>':'');
 
   renderWeightsTab(tickets, nEach);
+  saveState();
 }
 
 function renderWeightsTab(tickets, nEach){
@@ -422,6 +431,45 @@ function copyWeights(){
   });
 }
 
+// ── 本地储存：自动保存 / 读取 ──────────────────────────────
+const PARAM_IDS = ['totalBet','rtp','tickets','srPct','rPct','drawB','drawM','drawS','redeemRate','playerMultiplier'];
+const STORAGE_KEY = 'cardCalcState_v1';
+
+function saveState(){
+  const state = {};
+  PARAM_IDS.forEach(id=>{ const el=document.getElementById(id); if(el) state[id]=el.value; });
+  state.srPrizes  = sr.map(c=>c.prize);
+  state.setPrizes = sets.map(c=>c.prize);
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){}
+  // 短暂显示「已保存」提示
+  const ind = document.getElementById('saveIndicator');
+  if(ind){ ind.style.opacity='1'; clearTimeout(ind._t); ind._t=setTimeout(()=>ind.style.opacity='0', 1200); }
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return;
+    const state = JSON.parse(raw);
+    PARAM_IDS.forEach(id=>{ if(state[id]!=null){ const el=document.getElementById(id); if(el) el.value=state[id]; } });
+    if(state.srPrizes)  sr.forEach((c,i)=>{ if(state.srPrizes[i]!=null)  c.prize=Number(state.srPrizes[i]); });
+    if(state.setPrizes) sets.forEach((c,i)=>{ if(state.setPrizes[i]!=null) c.prize=Number(state.setPrizes[i]); });
+  } catch(e){}
+}
+
+function resetState(){
+  if(!confirm('确定要重置为默认值吗？')) return;
+  try{ localStorage.removeItem(STORAGE_KEY); } catch(e){}
+  // 还原奖金
+  SR_INIT.forEach((s,i)=>{ sr[i].prize=s.prize; });
+  SETS_INIT.forEach((s,i)=>{ sets[i].prize=s.prize; });
+  // 还原参数输入框
+  const defaults = {totalBet:100000000,rtp:1,tickets:100000,srPct:0.1,rPct:2,drawB:1,drawM:2,drawS:7,redeemRate:70,playerMultiplier:3};
+  PARAM_IDS.forEach(id=>{ const el=document.getElementById(id); if(el&&defaults[id]!=null) el.value=defaults[id]; });
+  calc();
+}
+
+loadState();
 calc();
 </script>
 </body>
