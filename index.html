@@ -89,7 +89,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 
 <div class="header">
   <h1>卡牌转盘精算工具</h1>
-  <p>设定奖金 → 自动算出概率 / 产量 / 权重，即时连动</p>
+  <p>设定票数占比 → 产量 / 概率 / 权重即时分配，预算使用率同步验算</p>
 </div>
 
 <div class="container">
@@ -109,15 +109,15 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
         <div class="param-group"><label>总券数</label><input type="number" id="tickets" value="100000" oninput="calc()"></div>
       </div>
       <div class="params-row">
-        <div class="param-group"><label>大奖池预算 %</label><input type="number" id="srPct" value="30" min="0" max="100" style="width:60px" oninput="calc()"></div>
-        <div class="param-group"><label>中奖池预算 %</label><input type="number" id="rPct" value="50" min="0" max="100" style="width:60px" oninput="calc()"></div>
+        <div class="param-group"><label>大奖池票数占比 %</label><input type="number" id="srPct" value="0.1" min="0" max="100" step="0.01" style="width:70px" oninput="calc()"></div>
+        <div class="param-group"><label>中奖池票数占比 %</label><input type="number" id="rPct" value="2" min="0" max="100" step="0.1" style="width:70px" oninput="calc()"></div>
       </div>
     </div>
 
     <div class="section">
       <div class="section-title">SR 卡 <span class="badge" style="background:var(--sr);color:var(--sr-dark)">大奖池 <span id="srCount">6</span>张</span></div>
       <table>
-        <thead><tr><th>球员</th><th>奖金 (RMB)</th><th>产量 (自动)</th><th>概率</th><th>支出</th><th>权重</th></tr></thead>
+        <thead><tr><th>球员</th><th>奖金 (RMB)</th><th>产量</th><th>概率</th><th>支出</th><th>权重</th></tr></thead>
         <tbody id="sr-body"></tbody>
       </table>
     </div>
@@ -138,7 +138,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
     </div>
 
     <div id="n-info" class="n-info"></div>
-    <div class="note">设定奖金 → 预算自动分配 → 产量/概率/权重即时算出。权重使用迭代法精确计算（200次迭代），误差 &lt; 5%。</div>
+    <div class="note">调整票数占比 → 各奖池产量等比缩放，权重即时更新。调整奖金不影响产量，仅影响预算使用率验算。权重误差 &lt; 5%。</div>
   </div>
 
   <div id="tab-weights" style="display:none">
@@ -218,57 +218,43 @@ function solveWeights(bigP, midP, smallP){
 }
 
 function calc(){
-  // Bug#3 fix: tickets=0 防除以零
   const totalBet=gv('totalBet'), rtp=gv('rtp')/100, tickets=Math.max(gv('tickets'),1);
   const srPct=gv('srPct')/100, rPct=gv('rPct')/100;
-  const nPct=Math.max(0, 1-srPct-rPct);
-  // Bug#4 fix: redeemRate=0 防 cqty=Infinity
-  const rr=Math.max(gv('redeemRate'),1)/100, pMult=gv('playerMultiplier');
+  const rr=Math.max(gv('redeemRate'),1)/100, pMult=Math.max(gv('playerMultiplier'),0.1);
   const budget=totalBet*rtp;
 
-  // Bug#1 fix: 記錄當前 focus 的 input id，innerHTML 重建後恢復
+  // focus 保留
   const focusedId = document.activeElement && document.activeElement.id || null;
   const focusedStart = document.activeElement && document.activeElement.selectionStart;
   const focusedEnd   = document.activeElement && document.activeElement.selectionEnd;
 
+  // 讀取獎金輸入
+  sr.forEach((c,i)=>{ const el=document.getElementById('sr-prize-'+i); if(el) c.prize=parseInt(el.value)||1; });
+  sets.forEach((c,i)=>{ const el=document.getElementById('set-prize-'+i); if(el) c.prize=parseInt(el.value)||1; });
 
-  // Read prizes from inputs
-  sr.forEach((c,i)=>{
-    const pEl=document.getElementById('sr-prize-'+i);
-    if(pEl) c.prize=parseInt(pEl.value)||1;
-  });
-  sets.forEach((c,i)=>{
-    const pEl=document.getElementById('set-prize-'+i);
-    if(pEl) c.prize=parseInt(pEl.value)||1;
-  });
-
-  // === SR: prize-driven qty ===
-  const srBudget = budget * srPct;
+  // === 方案A：以 tickets 為主軸 ===
+  // SR：srPct% 的票數，平均分配給每張 SR 卡
   const numSR = sr.length;
-  sr.forEach(c=>{
-    c.qty = Math.max(Math.round((srBudget / numSR) / c.prize), 1);
-  });
+  sr.forEach(c=>{ c.qty = Math.max(Math.round(tickets * srPct / numSR), 1); });
 
-  // === R: prize-driven qty ===
-  const rBudget = budget * rPct;
+  // R：rPct% 的票數，每套組平分；套組內按 1:pMult 拆分國家卡與球員卡
   const numSets = sets.length;
   sets.forEach(c=>{
-    const setBudget = rBudget / numSets;
-    const redeemQty = Math.max(Math.round(setBudget / c.prize), 1);
-    c.cqty = Math.max(Math.round(redeemQty / rr), 1);
+    const setTickets = tickets * rPct / numSets;
+    const totalParts = 1 + c.players.length * pMult;
+    c.cqty = Math.max(Math.round(setTickets / totalParts), 1);
     c.pqty = Math.max(Math.round(c.cqty * pMult), 1);
   });
 
-  // === N: remaining tickets ===
+  // N：剩餘票數均分
   const srQty = sr.reduce((s,c)=>s+c.qty, 0);
   const rCountryQty = sets.reduce((s,c)=>s+c.cqty, 0);
   const rPlayerQty = sets.reduce((s,c)=>s+c.pqty*c.players.length, 0);
-  const rTotalQty = rCountryQty + rPlayerQty;
-  const nTotal = tickets - srQty - rTotalQty;
+  const nTotal = tickets - srQty - rCountryQty - rPlayerQty;
   const numN = N_NAMES.length;
   const nEach = nTotal > 0 ? Math.round(nTotal / numN) : 0;
 
-  // === Spend ===
+  // === 預算驗算（參考） ===
   const srSpend = sr.reduce((s,c)=>s+c.prize*c.qty, 0);
   const setSpend = sets.reduce((s,c)=>s+c.prize*Math.round(c.cqty*rr), 0);
   const totalSpend = srSpend + setSpend;
@@ -276,31 +262,28 @@ function calc(){
   const usage = budget>0 ? totalSpend/budget*100 : 0;
   const over = remain < 0;
 
-  // === Weights ===
-  const numRCards = sets.reduce((s,c)=>s+1+c.players.length, 0); // country + players
+  // === 權重 ===
+  const numRCards = sets.reduce((s,c)=>s+1+c.players.length, 0);
   const bigP = sr.map(c=>c.qty/tickets);
-  // Bug#2 fix: midP 以 country/players 交錯順序建構，與 renderWeightsTab 的 mIdx 一致
   const midP = sets.flatMap(c=>[c.cqty/tickets, ...c.players.map(()=>c.pqty/tickets)]);
   const smallP = Array(numN).fill(nEach/tickets);
   weights = solveWeights(bigP, midP, smallP);
 
-  // === Update counts ===
+  // === 更新張數顯示 ===
   document.getElementById('srCount').textContent = numSR;
   document.getElementById('rCount').textContent = numRCards;
   document.getElementById('totalCardTypes').textContent = numSR + numRCards + numN;
 
-  // === Metrics ===
+  // === 指標卡 ===
   document.getElementById('metrics').innerHTML =
     metricCard('总预算','¥'+fmt(budget),'') +
     metricCard('总支出','¥'+fmt(totalSpend), over?'danger':'') +
     metricCard('使用率',usage.toFixed(1)+'%', usage>100?'danger':usage>95?'ok':'') +
     metricCard('剩余','¥'+fmt(remain), over?'danger':'ok');
 
-  // Bug#5 fix: srPct+rPct>100% 時顯示紅框警告
+  // srPct+rPct>100% 警告
   const pctOver = srPct + rPct > 1;
-  ['srPct','rPct'].forEach(id=>{
-    document.getElementById(id).style.borderColor = pctOver ? 'var(--red)' : '';
-  });
+  ['srPct','rPct'].forEach(id=>{ document.getElementById(id).style.borderColor = pctOver?'var(--red)':''; });
 
   // === SR Table ===
   let srHtml='';
