@@ -165,13 +165,20 @@ const SR_INIT = [
 ];
 
 const SETS_INIT = [
-  {name:"A套组",country:"西班牙",players:["佩德里","尼科·威廉姆斯","罗德里","达尼·卡瓦哈尔","法比安·鲁伊斯","达尼·奥尔莫"],prize:2200},
-  {name:"B套组",country:"英格兰",players:["布卡约·萨卡","朱德·贝林厄姆","科尔·帕尔默","摩根·罗杰斯","安东尼·戈登","马库斯·拉什福德"],prize:1900},
-  {name:"C套组",country:"法国",players:["乌斯曼·登贝莱","沃伦·扎伊尔-埃梅里","威廉·萨利巴","奥雷利安·楚阿梅尼","特奥·埃尔南德斯","兰德尔·科洛·穆阿尼"],prize:1500},
-  {name:"D套组",country:"阿根廷",players:["劳塔罗·马丁内斯","亚历克西斯·麦卡利斯特","罗德里戈·德保罗","埃米利亚诺·马丁内斯","克里斯蒂安·罗梅罗","尼古拉斯·奥塔门迪"],prize:2500}
+  {name:"A套组",country:"西班牙",players:["佩德里","尼科·威廉姆斯","罗德里"],prize:2200},
+  {name:"B套组",country:"英格兰",players:["布卡约·萨卡","朱德·贝林厄姆","科尔·帕尔默"],prize:1900},
+  {name:"C套组",country:"法国",players:["乌斯曼·登贝莱","沃伦·扎伊尔-埃梅里","威廉·萨利巴"],prize:1500},
+  {name:"D套组",country:"阿根廷",players:["劳塔罗·马丁内斯","亚历克西斯·麦卡利斯特","罗德里戈·德保罗"],prize:2500}
 ];
 
-const N_NAMES = ["巴西","葡萄牙","德国","荷兰","挪威","意大利"];
+// N卡：6国家 + 12球员（独立N卡，不属于任何套组）
+const N_NAMES = [
+  "巴西","葡萄牙","德国","荷兰","挪威","意大利",
+  "达尼·卡瓦哈尔","法比安·鲁伊斯","达尼·奥尔莫",
+  "摩根·罗杰斯","安东尼·戈登","马库斯·拉什福德",
+  "奥雷利安·楚阿梅尼","特奥·埃尔南德斯","兰德尔·科洛·穆阿尼",
+  "埃米利亚诺·马丁内斯","克里斯蒂安·罗梅罗","尼古拉斯·奥塔门迪"
+];
 
 let sr = SR_INIT.map(s=>({...s,qty:0}));
 let sets = SETS_INIT.map(s=>({...s,cqty:0,pqty:0}));
@@ -362,7 +369,7 @@ function renderWeightsTab(tickets, nEach){
     const v=(weights.verS[i]*100).toFixed(3);
     const e=errPct(prob,v);
     allCards.push({name:n,w:weights.intS[i]});
-    html+=`<tr class="n-row"><td class="center">${idx++}</td><td>小奖池</td><td>N(国家)</td><td>${n}</td><td class="prob-cell">${prob}%</td><td class="weight-cell">${weights.intS[i]}</td><td class="prob-cell">${v}%</td><td class="center ${errClass(e)}">${e}</td></tr>`;
+    html+=`<tr class="n-row"><td class="center">${idx++}</td><td>小奖池</td><td>${i<6?'N(国家)':'N(球员)'}</td><td>${n}</td><td class="prob-cell">${prob}%</td><td class="weight-cell">${weights.intS[i]}</td><td class="prob-cell">${v}%</td><td class="center ${errClass(e)}">${e}</td></tr>`;
   });
 
   document.getElementById('weight-body').innerHTML=html;
