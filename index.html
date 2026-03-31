@@ -56,6 +56,10 @@ tr.n-row{background:var(--n)}
 tr.total-row{background:#e2e8f0;font-weight:600}
 td input{width:80px;padding:4px 8px;border:1.5px solid var(--blue);border-radius:4px;font-size:13px;font-weight:600;color:var(--blue-dark);background:var(--blue-light);text-align:right;font-family:var(--mono)}
 td input:focus{outline:none;border-color:var(--blue-dark);box-shadow:0 0 0 2px rgba(37,99,235,0.15)}
+/* 移除所有 number input 的 spinner 箭頭 */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield}
 .weight-cell{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--blue-dark);text-align:center}
 .prob-cell{font-family:var(--mono);text-align:right}
 .num-cell{font-family:var(--mono);text-align:right}
@@ -305,7 +309,7 @@ function calc(){
   sr.forEach((c,i)=>{
     const prob=(c.qty/tickets*100).toFixed(3);
     const spend=c.prize*c.qty;
-    srHtml+=`<tr class="sr-row"><td>${c.name}</td><td><input type="number" id="sr-prize-${i}" value="${c.prize}" oninput="calc()"></td><td class="num-cell">${fmt(c.qty)}</td><td class="prob-cell">${prob}%</td><td class="num-cell">${fmt(spend)}</td><td class="weight-cell">${weights.intB[i]}</td></tr>`;
+    srHtml+=`<tr class="sr-row"><td>${c.name}</td><td><input type="number" id="sr-prize-${i}" value="${c.prize}" onchange="calc()"></td><td class="num-cell">${fmt(c.qty)}</td><td class="prob-cell">${prob}%</td><td class="num-cell">${fmt(spend)}</td><td class="weight-cell">${weights.intB[i]}</td></tr>`;
   });
   srHtml+=`<tr class="total-row"><td>合计</td><td></td><td class="num-cell">${fmt(srQty)}</td><td class="prob-cell">${(srQty/tickets*100).toFixed(3)}%</td><td class="num-cell">${fmt(srSpend)}</td><td></td></tr>`;
   document.getElementById('sr-body').innerHTML=srHtml;
@@ -317,7 +321,7 @@ function calc(){
   sets.forEach((c,i)=>{
     const redeem=Math.round(c.cqty*rr);
     const spend=c.prize*redeem;
-    setHtml+=`<tr class="r-row"><td>${c.name}</td><td>${c.country}</td><td><input type="number" id="set-prize-${i}" value="${c.prize}" oninput="calc()"></td><td class="num-cell">${fmt(c.cqty)}</td><td class="num-cell">${fmt(c.pqty)}</td><td class="num-cell">${fmt(redeem)}</td><td class="num-cell">${fmt(spend)}</td><td class="weight-cell">${weights.intM[countryMidIdx]}</td></tr>`;
+    setHtml+=`<tr class="r-row"><td>${c.name}</td><td>${c.country}</td><td><input type="number" id="set-prize-${i}" value="${c.prize}" onchange="calc()"></td><td class="num-cell">${fmt(c.cqty)}</td><td class="num-cell">${fmt(c.pqty)}</td><td class="num-cell">${fmt(redeem)}</td><td class="num-cell">${fmt(spend)}</td><td class="weight-cell">${weights.intM[countryMidIdx]}</td></tr>`;
     countryMidIdx += 1 + c.players.length;
   });
   setHtml+=`<tr class="total-row"><td>合计</td><td></td><td></td><td class="num-cell">${fmt(rCountryQty)}</td><td class="num-cell">${fmt(rPlayerQty)}</td><td class="num-cell">${sets.reduce((s,c)=>s+Math.round(c.cqty*rr),0)}</td><td class="num-cell">${fmt(setSpend)}</td><td></td></tr>`;
