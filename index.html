@@ -215,11 +215,18 @@ function solveWeights(bigP, midP, smallP){
 }
 
 function calc(){
-  const totalBet=gv('totalBet'), rtp=gv('rtp')/100, tickets=gv('tickets');
+  // Bug#3 fix: tickets=0 防除以零
+  const totalBet=gv('totalBet'), rtp=gv('rtp')/100, tickets=Math.max(gv('tickets'),1);
   const srPct=gv('srPct')/100, rPct=gv('rPct')/100;
   const nPct=Math.max(0, 1-srPct-rPct);
-  const rr=gv('redeemRate')/100, pMult=gv('playerMultiplier');
+  // Bug#4 fix: redeemRate=0 防 cqty=Infinity
+  const rr=Math.max(gv('redeemRate'),1)/100, pMult=gv('playerMultiplier');
   const budget=totalBet*rtp;
+
+  // Bug#1 fix: 記錄當前 focus 的 input id，innerHTML 重建後恢復
+  const focusedId = document.activeElement && document.activeElement.id || null;
+  const focusedStart = document.activeElement && document.activeElement.selectionStart;
+  const focusedEnd   = document.activeElement && document.activeElement.selectionEnd;
 
   document.getElementById('nPctDisplay').textContent = (nPct*100).toFixed(0);
 
@@ -270,11 +277,9 @@ function calc(){
   // === Weights ===
   const numRCards = sets.reduce((s,c)=>s+1+c.players.length, 0); // country + players
   const bigP = sr.map(c=>c.qty/tickets);
-  const midP = [
-    ...sets.map(c=>c.cqty/tickets),
-    ...sets.flatMap(c=>c.players.map(()=>c.pqty/tickets))
-  ];
-  const smallP = Array(numN).fill(nEach/Math.max(tickets,1));
+  // Bug#2 fix: midP 以 country/players 交錯順序建構，與 renderWeightsTab 的 mIdx 一致
+  const midP = sets.flatMap(c=>[c.cqty/tickets, ...c.players.map(()=>c.pqty/tickets)]);
+  const smallP = Array(numN).fill(nEach/tickets);
   weights = solveWeights(bigP, midP, smallP);
 
   // === Update counts ===
@@ -289,6 +294,12 @@ function calc(){
     metricCard('使用率',usage.toFixed(1)+'%', usage>100?'danger':usage>95?'ok':'') +
     metricCard('剩余','¥'+fmt(remain), over?'danger':'ok');
 
+  // Bug#5 fix: srPct+rPct>100% 時顯示紅框警告
+  const pctOver = srPct + rPct > 1;
+  ['srPct','rPct'].forEach(id=>{
+    document.getElementById(id).style.borderColor = pctOver ? 'var(--red)' : '';
+  });
+
   // === SR Table ===
   let srHtml='';
   sr.forEach((c,i)=>{
@@ -300,14 +311,23 @@ function calc(){
   document.getElementById('sr-body').innerHTML=srHtml;
 
   // === R Table ===
+  // Bug#2 fix: 國家卡在新 midP 中的 index = 各 set 的 (1+players.length) 累加
   let setHtml='';
+  let countryMidIdx=0;
   sets.forEach((c,i)=>{
     const redeem=Math.round(c.cqty*rr);
     const spend=c.prize*redeem;
-    setHtml+=`<tr class="r-row"><td>${c.name}</td><td>${c.country}</td><td><input type="number" id="set-prize-${i}" value="${c.prize}" oninput="calc()"></td><td class="num-cell">${fmt(c.cqty)}</td><td class="num-cell">${fmt(c.pqty)}</td><td class="num-cell">${fmt(redeem)}</td><td class="num-cell">${fmt(spend)}</td><td class="weight-cell">${weights.intM[i]}</td></tr>`;
+    setHtml+=`<tr class="r-row"><td>${c.name}</td><td>${c.country}</td><td><input type="number" id="set-prize-${i}" value="${c.prize}" oninput="calc()"></td><td class="num-cell">${fmt(c.cqty)}</td><td class="num-cell">${fmt(c.pqty)}</td><td class="num-cell">${fmt(redeem)}</td><td class="num-cell">${fmt(spend)}</td><td class="weight-cell">${weights.intM[countryMidIdx]}</td></tr>`;
+    countryMidIdx += 1 + c.players.length;
   });
   setHtml+=`<tr class="total-row"><td>合计</td><td></td><td></td><td class="num-cell">${fmt(rCountryQty)}</td><td class="num-cell">${fmt(rPlayerQty)}</td><td class="num-cell">${sets.reduce((s,c)=>s+Math.round(c.cqty*rr),0)}</td><td class="num-cell">${fmt(setSpend)}</td><td></td></tr>`;
   document.getElementById('set-body').innerHTML=setHtml;
+
+  // Bug#1 fix: innerHTML 重建後恢復 focus
+  if(focusedId){
+    const el=document.getElementById(focusedId);
+    if(el){ el.focus(); try{ el.setSelectionRange(focusedStart,focusedEnd); }catch(e){} }
+  }
 
   // === N Info ===
   document.getElementById('n-info').innerHTML =
